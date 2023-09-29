@@ -14,7 +14,7 @@ pub use self::kiocb::Kiocb;
 use crate::error::{code::*, from_result, to_result, Error};
 use crate::types::Opaque;
 use crate::{bindings, str::CStr, try_pin_init, ThisModule};
-use core::{ffi, pin::Pin};
+use core::{ffi, marker::PhantomData, pin::Pin};
 use pin_init::{pin_data, PinInit, pinned_drop};
 use crate::str::CStrExt;
 
@@ -77,5 +77,59 @@ impl PinnedDrop for Registration {
         // `register_filesystem` has necessarily succeeded. So it's ok to call
         // `unregister_filesystem` on the previously registered fs.
         unsafe { bindings::unregister_filesystem(self.fs.get()) };
+    }
+}
+
+/// Kernel module that exposes a single file system implemented by `T`.
+#[pin_data]
+pub struct Module<T: FileSystem + ?Sized> {
+    #[pin]
+    fs_reg: Registration,
+    _p: PhantomData<T>,
+}
+
+impl<T: FileSystem + ?Sized + Sync + Send> crate::InPlaceModule for Module<T> {
+    fn init(module: &'static ThisModule) -> impl PinInit<Self, Error> {
+        try_pin_init!(Self {
+            fs_reg <- Registration::new::<T>(module),
+            _p: PhantomData,
+        })
+    }
+}
+
+/// Declares a kernel module that exposes a single file system.
+///
+/// The `type` argument must be a type which implements the [`FileSystem`] trait. Also accepts
+/// various forms of kernel metadata.
+///
+/// # Examples
+///
+/// ```
+/// # mod module_fs_sample {
+/// use kernel::fs;
+/// use kernel::prelude::*;
+///
+/// kernel::module_fs! {
+///     type: MyFs,
+///     name: "myfs",
+///     author: "Rust for Linux Contributors",
+///     description: "My Rust fs",
+///     license: "GPL",
+/// }
+///
+/// struct MyFs;
+/// impl fs::FileSystem for MyFs {
+///     const NAME: &'static CStr = kernel::c_str!("myfs");
+/// }
+/// # }
+/// ```
+#[macro_export]
+macro_rules! module_fs {
+    (type: $type:ty, $($f:tt)*) => {
+        type ModuleType = $crate::fs::Module<$type>;
+        $crate::macros::module! {
+            type: ModuleType,
+            $($f)*
+        }
     }
 }
