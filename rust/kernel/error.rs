@@ -506,7 +506,7 @@ pub fn from_err_ptr<T>(ptr: *mut T) -> Result<*mut T> {
 ///     })
 /// }
 /// ```
-pub fn from_result<T, F>(f: F) -> T
+pub(crate) fn from_result<T, F>(f: F) -> T
 where
     T: From<i16>,
     F: FnOnce() -> Result<T>,
