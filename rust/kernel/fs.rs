@@ -112,7 +112,7 @@ impl<T: FileSystem + ?Sized + Sync + Send> crate::InPlaceModule for Module<T> {
 /// kernel::module_fs! {
 ///     type: MyFs,
 ///     name: "myfs",
-///     author: "Rust for Linux Contributors",
+///     authors: ["Rust for Linux Contributors"],
 ///     description: "My Rust fs",
 ///     license: "GPL",
 /// }
